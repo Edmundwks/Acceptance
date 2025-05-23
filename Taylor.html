@@ -1,0 +1,538 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jolene's Birthday Lucky Draw</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- GSAP CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <!-- Google Fonts: Indie Flower -->
+  <link href="https://fonts.googleapis.com/css2?family=Indie+Flower&family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Indie Flower', cursive;
+      background: linear-gradient(to bottom, #ffe4e1, #fff0f5);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      transition: all 2s ease;
+      position: relative;
+    }
+    
+    /* Taylor theme styles */
+    .taylor-theme {
+      background: linear-gradient(to bottom, #ffe4e1, #fff0f5);
+    }
+    
+    /* Sleeping At Last theme styles */
+    .sleeping-theme {
+      background: url('https://images.pexels.com/photos/956981/milky-way-starry-sky-night-sky-star-956981.jpeg') no-repeat center center fixed;
+      background-size: cover;
+      background-color: #2d1b4e; /* Fallback dark purple */
+      position: relative;
+    }
+    
+    .sleeping-theme::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7); /* Darker overlay for readability */
+      z-index: 0;
+    }
+    
+    /* Taylor paper styles */
+    .taylor-paper {
+      background: #fff5e6;
+      border: 2px solid #ff9999;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      color: #333;
+    }
+    
+    /* Sleeping At Last paper styles */
+    .sleeping-paper {
+      background: url('https://images.pexels.com/photos/1252890/pexels-photo-1252890.jpeg') rgba(255, 255, 255, 0.1);
+      background-size: cover;
+      border: 2px solid #00b7eb; /* Cyan border */
+      box-shadow: 0 0 15px rgba(0, 183, 235, 0.8);
+      color: #ffffff;
+    }
+    
+    /* Taylor button styles */
+    .taylor-button {
+      background-color: #ff9999;
+      color: white;
+    }
+    
+    .taylor-button:hover {
+      background-color: #ff7777;
+    }
+    
+    /* Sleeping At Last button styles */
+    .sleeping-button {
+      background: linear-gradient(to right, #00b7eb, #1e3a8a); /* Cyan to navy */
+      color: #ffffff;
+    }
+    
+    .sleeping-button:hover {
+      box-shadow: 0 0 10px rgba(0, 183, 235, 0.8);
+    }
+    
+    /* Common styles */
+    #paper {
+      display: none;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 280px;
+      text-align: center;
+      margin-bottom: 20px;
+      transition: all 1s ease;
+    }
+    
+    #draw-again {
+      z-index: 10;
+    }
+    
+    #gift-box {
+      cursor: pointer;
+      transition: transform 0.2s;
+      z-index: 1;
+    }
+    
+    #gift-box:hover {
+      transform: scale(1.05);
+    }
+    
+    #audio-toggle {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 2;
+    }
+    
+    /* Transition overlay */
+    #transition-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: black;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 2s ease;
+    }
+    
+    /* Star animation for transition */
+    .star {
+      position: absolute;
+      background-color: white;
+      border-radius: 50%;
+      animation: twinkle 2s infinite alternate;
+      z-index: 1001;
+      opacity: 0;
+      transition: opacity 1s ease;
+    }
+    
+    @keyframes twinkle {
+      0% { opacity: 0.2; }
+      100% { opacity: 1; }
+    }
+    
+    /* Text glow effects for Sleeping At Last theme */
+    .heading-glow {
+      font-family: 'Cinzel', serif;
+      text-shadow: 0 0 10px rgba(0, 183, 235, 0.7);
+      color: #ffffff; /* White for elegance */
+    }
+    
+    .text-glow {
+      text-shadow: 0 0 8px rgba(0, 183, 235, 0.7);
+      color: #ffffff; /* White with cyan glow */
+    }
+    
+    #bensound-attribution {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      font-size: 12px;
+      color: #ffffff;
+      text-shadow: 0 0 5px rgba(0, 183, 235, 0.7);
+      z-index: 1;
+      opacity: 0;
+      transition: opacity 2s ease;
+    }
+  </style>
+</head>
+<body class="taylor-theme">
+  <div id="transition-overlay"></div>
+  <button id="audio-toggle" class="px-3 py-1 rounded-lg taylor-button">Play Music</button>
+  <div id="content-container" class="text-center relative z-1 text-pink-800">
+    <h1 id="main-heading" class="text-4xl md:text-5xl mb-4">Happy Birthday, Jolene! 🎉</h1>
+    <p id="subtitle" class="text-xl mb-6">Draw a special note from the box! You have <span id="tries">5</span> tries (or more, shh!)</p>
+    <p id="draw-counter" class="text-lg mb-4">Draws: <span id="draw-count">0</span>/19</p>
+    <img id="gift-box" src="https://img.icons8.com/color/96/000000/gift.png" alt="Gift Box" class="mx-auto mb-4">
+    <div class="flex flex-col items-center">
+      <div id="paper" class="text-lg taylor-paper"></div>
+      <button id="draw-again" class="mt-4 px-4 py-2 rounded-lg hidden taylor-button">Draw Again</button>
+    </div>
+  </div>
+  <div id="bensound-attribution">Sound Effects by Bensound</div>
+
+  <!-- Audio Elements -->
+  <audio id="bg-music" loop>
+    <source src="https://www.bensound.com/bensound-music/bensound-sunny.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+  </audio>
+  <audio id="taylor-music">
+    <source src="audio/taylor.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+  </audio>
+  <audio id="saturn-music" loop preload="auto">
+    <source src="audio/saturn.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+  </audio>
+  <audio id="open-box">
+    <source src="https://www.bensound.com/bensound-music/bensound-popsound.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+  </audio>
+  <audio id="sparkle">
+    <source src="https://www.bensound.com/bensound-music/bensound-magic.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+  </audio>
+
+  <script>
+    const drawables = [
+      { type: "Rhulf", text: "Hiii Jolenee! Click draw to discover treasures made 4 uu" }, // 1st  
+      { type: "Rhulf", text: "Click Top Right for music, lets starttt" }, // 2nd  
+      { type: "Letter from Taylor Swift", text: "You're so gorgeous, I can't say anything to your face, 'Cause look at your face (gorgeous)" }, // 3rd
+      { type: "Action Card", text: "Call the best person in the world to proceedd" }, // 4th
+      { type: "Jolene's Q", text: "If God blessed everything you touch in ur 21, what would you be doingg?" }, // Light-hearted
+      { type: "Edmund's Q", text: "What was the most beautiful thing Jolene ever said?" }, // Light-hearted
+      { type: "Edmund's Q", text: "If you could have one of Jolene's trait for a day, what would it be?" }, // Light-hearted
+      { type: "Promise Card", text: "Play Detroit when Jo is back." }, // Light-hearted
+      { type: "Promise Card", text: "Watch 5 episodes of Bojack Horseman." }, // Light-hearted
+      { type: "Jolene's Q", text: "What was surprisingg about the past year? :D" }, // Light-hearted
+      { type: "Edmund's Q", text: "If Jolene became an animal, what would she be and why?" }, // Light-hearted
+      { type: "Letter from Sleeping At Last", text: "With shortness of breath, I'll try to explain how rare and beautiful it truly is that we exist" }, // 12th (index 11)
+      { type: "Jolene's Q", text: "What's value to you? Was it within reach in 20th?" }, // Deep question
+      { type: "Jolene's Q", text: "Is there something about you that you'd like to protect from the years to come?" }, // Deep question
+      { type: "Promise Card", text: "I'll share dessert with you when you're back in KL (Max 1/week)" },
+      { type: "Letter from God", text: "I will instruct you and teach you in the way you should go; I will counsel you with my eye upon you. Psalms 32:8" },
+      { type: "Action Card", text: "Say Edmund is the best person in the world" }, // 17th (3rd to last)
+      { type: "Action Card", text: "Take a picture to remember this day!" }, // 18th (2nd to last)
+      { type: "Final Card", text: "Happy birthday!!" } // 19th (last)
+    ];
+
+    // Custom shuffle to respect fixed positions
+    function customShuffle(drawables) {
+      // Fixed positions that should not be shuffled
+      const fixedIndices = { 
+        0: drawables[0],   // Rhulf intro
+        1: drawables[1],   // Music
+        2: drawables[2],   // Taylor Swift
+        3: drawables[3],   // Call best person
+        11: drawables[11], // Sleeping At Last (now at position 11)
+        16: drawables[16], // Say Edmund is best
+        17: drawables[17], // Take picture
+        18: drawables[18]  // Final card
+      };
+      
+      // Light-hearted questions to shuffle before Sleeping At Last
+      const earlyShuffleIndices = [4, 5, 6, 7, 8, 9, 10];
+      const earlyShuffleItems = earlyShuffleIndices.map(i => drawables[i]);
+      
+      // Deep questions and remaining items to shuffle after Sleeping At Last
+      const lateShuffleIndices = [12, 13, 14, 15];
+      const lateShuffleItems = lateShuffleIndices.map(i => drawables[i]);
+
+      // Fisher-Yates shuffle for the early items
+      for (let i = earlyShuffleItems.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [earlyShuffleItems[i], earlyShuffleItems[j]] = [earlyShuffleItems[j], earlyShuffleItems[i]];
+      }
+      
+      // Fisher-Yates shuffle for the late items
+      for (let i = lateShuffleItems.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [lateShuffleItems[i], lateShuffleItems[j]] = [lateShuffleItems[j], lateShuffleItems[i]];
+      }
+
+      // Rebuild array with fixed and shuffled items
+      const result = [];
+      let earlyIndex = 0;
+      let lateIndex = 0;
+      
+      for (let i = 0; i < drawables.length; i++) {
+        if (fixedIndices[i]) {
+          result[i] = fixedIndices[i];
+        } else if (i < 11) {
+          // Before Sleeping At Last card, use early shuffle items
+          result[i] = earlyShuffleItems[earlyIndex++];
+        } else {
+          // After Sleeping At Last card, use late shuffle items
+          result[i] = lateShuffleItems[lateIndex++];
+        }
+      }
+      return result;
+    }
+    
+    // Update maxDraws to match the new total
+    const shuffledDrawables = customShuffle([...drawables]);
+    let drawCount = 0;
+    const maxDraws = 19;
+
+    const giftBox = document.getElementById('gift-box');
+    const paper = document.getElementById('paper');
+    const drawAgainBtn = document.getElementById('draw-again');
+    const drawCountDisplay = document.getElementById('draw-count');
+    const bgMusic = document.getElementById('bg-music');
+    const taylorMusic = document.getElementById('taylor-music');
+    const saturnMusic = document.getElementById('saturn-music');
+    const openBoxSound = document.getElementById('open-box');
+    const sparkleSound = document.getElementById('sparkle');
+    const audioToggle = document.getElementById('audio-toggle');
+    const transitionOverlay = document.getElementById('transition-overlay');
+    const mainHeading = document.getElementById('main-heading');
+    const subtitle = document.getElementById('subtitle');
+    const drawCounter = document.getElementById('draw-counter');
+    const contentContainer = document.getElementById('content-container');
+    const bensoundAttribution = document.getElementById('bensound-attribution');
+    const body = document.body;
+
+    // Set initial volumes
+    bgMusic.volume = 0.3;
+    taylorMusic.volume = 0.3;
+    saturnMusic.volume = 0.3;
+    openBoxSound.volume = 0.7;
+    sparkleSound.volume = 0.7;
+
+    // Create stars for the transition
+    function createStars() {
+      for (let i = 0; i < 100; i++) {
+        const star = document.createElement('div');
+        star.classList.add('star');
+        star.style.width = `${Math.random() * 3 + 1}px`;
+        star.style.height = star.style.width;
+        star.style.left = `${Math.random() * 100}%`;
+        star.style.top = `${Math.random() * 100}%`;
+        star.style.animationDelay = `${Math.random() * 2}s`;
+        document.body.appendChild(star);
+      }
+    }
+
+    // Create stars but keep them hidden initially
+    createStars();
+
+    // Play initial music and fade out after 10 seconds
+    window.addEventListener('DOMContentLoaded', () => {
+      bgMusic.play().then(() => {
+        console.log('Background music playing');
+        audioToggle.textContent = 'Pause Music';
+        isMusicPlaying = true;
+        
+        // Fade out after 10 seconds
+        setTimeout(() => {
+          const fadeOut = setInterval(() => {
+            if (bgMusic.volume > 0.05) {
+              bgMusic.volume -= 0.05;
+            } else {
+              bgMusic.pause();
+              bgMusic.currentTime = 0;
+              clearInterval(fadeOut);
+            }
+          }, 200);
+        }, 10000);
+      }).catch(e => console.log('Background music blocked:', e));
+    });
+
+    // Audio toggle functionality
+    let isMusicPlaying = false;
+    audioToggle.addEventListener('click', () => {
+      if (isMusicPlaying) {
+        bgMusic.pause();
+        taylorMusic.pause();
+        saturnMusic.pause();
+        audioToggle.textContent = 'Play Music';
+        isMusicPlaying = false;
+      } else {
+        // Play the appropriate music based on the current state
+        if (drawCount === 3) { // Taylor Swift card is now at index 2 (3rd card)
+          taylorMusic.play();
+        } else if (drawCount >= 11) { // Sleeping At Last card is now at index 11 (12th card)
+          saturnMusic.play();
+        } else {
+          bgMusic.play();
+        }
+        audioToggle.textContent = 'Pause Music';
+        isMusicPlaying = true;
+      }
+    });
+
+    giftBox.addEventListener('click', draw);
+    drawAgainBtn.addEventListener('click', draw);
+
+    function draw() {
+      if (drawCount >= maxDraws) {
+        paper.innerHTML = "All notes drawn! Happy Birthday, Jolene! 💖";
+        paper.style.display = 'block';
+        giftBox.style.display = 'none';
+        drawAgainBtn.style.display = 'none';
+        return;
+      }
+
+      // Play open box sound
+      openBoxSound.pause();
+      openBoxSound.currentTime = 0;
+      openBoxSound.play().then(() => console.log('Open box sound played')).catch(e => console.log('Open box sound blocked:', e));
+
+      // Shake animation
+      gsap.to(giftBox, {
+        x: '+=10',
+        yoyo: true,
+        repeat: 5,
+        duration: 0.1,
+        onComplete: () => {
+          giftBox.style.display = 'none';
+          showPaper();
+        }
+      });
+    }
+
+    function showPaper() {
+      const drawable = shuffledDrawables[drawCount];
+      paper.innerHTML = `<strong>${drawable.type}</strong><br>${drawable.text}`;
+      paper.style.display = 'block';
+      drawAgainBtn.style.display = 'block';
+
+      // Play sparkle sound
+      sparkleSound.pause();
+      sparkleSound.currentTime = 0;
+      sparkleSound.play().then(() => console.log('Sparkle sound played')).catch(e => console.log('Sparkle sound blocked:', e));
+
+      // Paper reveal animation
+      gsap.fromTo(paper, { y: 100, opacity: 0 }, { y: 0, opacity: 1, duration: 1, ease: 'bounce.out' });
+
+      drawCount++;
+      drawCountDisplay.textContent = drawCount;
+
+      // Special handling for Taylor Swift card (1st card)
+      if (drawCount === 3) {
+        // Pause any playing music
+        bgMusic.pause();
+        saturnMusic.pause();
+        
+        // Play Taylor Swift music
+        taylorMusic.currentTime = 0;
+        taylorMusic.play().then(() => {
+          console.log('Taylor music playing');
+        }).catch(e => console.log('Taylor music blocked:', e));
+      }
+
+      // Check if this is the Sleeping At Last card (12th card, index 11)
+      if (drawCount === 12) {
+        bgMusic.pause();
+        taylorMusic.pause();
+
+        // Start Saturn music immediately (only once)
+        if (saturnMusic.paused) {
+          saturnMusic.volume = 0.3; // Start at normal volume
+          saturnMusic.play().then(() => {
+            audioToggle.textContent = 'Pause Music';
+            isMusicPlaying = true;
+          }).catch(e => console.log('Saturn music blocked:', e));
+        }
+
+        // Start transition overlay at the same time
+        transitionOverlay.style.opacity = '1';
+
+        // After a short delay, do the rest of the theme change
+        setTimeout(() => {
+          body.classList.remove('taylor-theme');
+          body.classList.add('sleeping-theme');
+          
+          // Change text styles
+          mainHeading.classList.add('heading-glow');
+          mainHeading.textContent = "Happy Birthday, Jolene! 🌌";
+          subtitle.classList.add('text-glow');
+          subtitle.textContent = "Draw a cosmic note from the galaxy! You have 5 tries (or more, shh!)";
+          drawCounter.classList.add('text-glow');
+          
+          // Change paper and button styles
+          paper.classList.remove('taylor-paper');
+          paper.classList.add('sleeping-paper');
+          drawAgainBtn.classList.remove('taylor-button');
+          drawAgainBtn.classList.add('sleeping-button');
+          audioToggle.classList.remove('taylor-button');
+          audioToggle.classList.add('sleeping-button');
+          
+          // Show attribution
+          bensoundAttribution.style.opacity = '1';
+          
+          // Show stars
+          document.querySelectorAll('.star').forEach(star => {
+            star.style.opacity = '1';
+          });
+
+         
+
+          // Fade out the black overlay
+          setTimeout(() => {
+            transitionOverlay.style.opacity = '0';
+          }, 1000);
+        }, 2000);
+      }
+
+      if (drawCount >= maxDraws) {
+        drawAgainBtn.style.display = 'none';
+      }
+    }
+  </script>
+</body>
+</html>
